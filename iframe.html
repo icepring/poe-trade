@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iframe</title>
+</head>
+<body>
+  <h1>XHR Data</h1>
+  <div id="xhrData"></div>
+
+  <script>
+    window.addEventListener("message", (event) => {
+      // 安全检查，确保消息来自可信的来源
+      if (event.origin !== "chrome-extension://lekkpeibmncgpmkgpnhdnamidjpofnih") {
+        return;
+      }
+
+      // 获取并显示数据
+      const { method, url, body } = event.data;
+      const xhrDataDiv = document.getElementById("xhrData");
+      xhrDataDiv.innerHTML = `
+        <p><strong>Method:</strong> ${method}</p>
+        <p><strong>URL:</strong> ${url}</p>
+        <pre><strong>Body:</strong> ${JSON.stringify(body, null, 2)}</pre>
+      `;
+    });
+  </script>
+</body>
+</html>

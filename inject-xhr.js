@@ -12,13 +12,22 @@
     if (body) {
       try {
         const parsed = typeof body === 'string' ? JSON.parse(body) : body;
-        window.dispatchEvent(
-          new CustomEvent("xhr-body", { detail: { method: this._method, url: this._url, body: parsed } })
-        );
-      } catch (error){
-        console.log("拦截到XHR请求失败：", error);
+
+        window.postMessage({
+          source: "xhr-interceptor",
+          payload: {
+            method: this._method,
+            url: this._url,
+            body: parsed
+          }
+        }, "*");
+
+        console.log("拦截到XHR并发送给content.js:", parsed);
+      } catch (e) {
+        console.warn("解析body失败:", e);
       }
     }
+
     return originalSend.apply(this, arguments);
   };
 })();

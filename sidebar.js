@@ -25,13 +25,21 @@ function createMenuItem(label = "新菜单", isChild = false, condition = {}, pa
   if (isChild) {
     addBtn.textContent = "🔍";
     addBtn.onclick = () => {
-      // todo: 打开与二级菜单相关的条件设置
-      alert('点击了条件设置按钮');
+		const current = interceptConditions[parentIndex]?.[childIndex];
+	  if (!current || !current.body?.query) {
+		alert("当前项未设置有效条件！");
+		return;
+	  }
+
+	  const queryString = encodeURIComponent(JSON.stringify(current.body));
+	  const TRAD_URL = 'https://poe.game.qq.com/trade/search';
+	  const jumpUrl = `${TRAD_URL}?q=${queryString}`;
+	  window.open(jumpUrl, '_blank');
     };
   } else {
     addBtn.onclick = () => {
-      const { child, p, c } = createMenuItem("子菜单", true, {}, parentIndex, interceptConditions[parentIndex]?.length || 0);
-      li.appendChild(child);
+      const { li: childLi } = createMenuItem("子菜单", true, {}, parentIndex, interceptConditions[parentIndex]?.length || 0);
+      li.appendChild(childLi);
       interceptConditions[parentIndex] = interceptConditions[parentIndex] || [];
       interceptConditions[parentIndex].push({});  // 初始化该子菜单的条件
     };
@@ -57,7 +65,7 @@ function createMenuItem(label = "新菜单", isChild = false, condition = {}, pa
 
   // 为二级菜单添加一个保存按钮
   const saveChildBtn = document.createElement("button");
-  saveChildBtn.textContent = "保存";
+  saveChildBtn.textContent = "💾";
   saveChildBtn.onclick = () => {
     const id = generateId(parentIndex, childIndex);  // 生成唯一的标识符
     interceptConditions[parentIndex][childIndex] = pendingRequests;  // 将暂存的请求条件保存到当前菜单
@@ -69,8 +77,9 @@ function createMenuItem(label = "新菜单", isChild = false, condition = {}, pa
 
   div.appendChild(input);
   div.appendChild(addBtn);
-  div.appendChild(delBtn);
   if (isChild) div.appendChild(saveChildBtn);  // 仅二级菜单添加保存按钮
+  div.appendChild(delBtn);
+  
   li.appendChild(div);
 
   return { li, parentIndex, childIndex };
@@ -130,16 +139,13 @@ function load() {
 
 load();
 
-// 监听拦截到的XHR请求并暂存到 pendingRequests
-window.addEventListener("xhr-body", e => {
-  const detail = e.detail;
-  console.log("拦截到XHR请求：", detail);
-  pendingRequests = {
-    method: detail.method,
-    url: detail.url,
-    body: detail.body,
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "interceptXhr") {
+    console.log("sidebar 收到 xhr 数据:", message.data);
+    pendingRequests = {
+    method: message.data.method,
+    url: message.data.url,
+    body: message.data.body,
   };
-
-  // 将拦截到的请求暂存到 pendingRequests 中
-  alert(`拦截到请求：\n方法: ${detail.method}\nURL: ${detail.url}`);
+  }
 });

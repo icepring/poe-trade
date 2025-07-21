@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "POE侧边栏",
   "version": "1.0",
-  "permissions": ["scripting", "activeTab"],
+  "permissions": ["scripting", "activeTab", "tabs"],
   "host_permissions": [
     "https://poe.game.qq.com/trade/search/*"
   ],
@@ -20,7 +20,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["sidebar.html", "sidebar.css", "inject-xhr.js"],
+      "resources": ["sidebar.html", "sidebar.css", "inject-xhr.js", "iframe.html"],
       "matches": ["<all_urls>"]
     }
   ]
