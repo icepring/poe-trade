@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "POE侧边栏",
+  "version": "1.0",
+  "permissions": ["scripting", "activeTab"],
+  "host_permissions": [
+    "https://poe.game.qq.com/trade/search/*"
+  ],
+  "action": {
+    "default_icon": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://poe.game.qq.com/trade/search/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["sidebar.html", "sidebar.css", "inject-xhr.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
