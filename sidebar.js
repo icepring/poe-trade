@@ -4,6 +4,7 @@ const saveBtn = document.getElementById("save-btn");
 
 let interceptConditions = [];  // 用于存储拦截器的条件（二维数组）
 let pendingRequests = {};      // 用于暂存拦截到的XHR请求
+let items = {};      // 用于暂存拦截到的XHR请求
 
 // 用于生成唯一标识符
 function generateId(parentIndex, childIndex) {
@@ -25,6 +26,7 @@ function createMenuItem(label = "新菜单", isChild = false, condition = {}, pa
   if (isChild) {
     addBtn.textContent = "🔍";
     addBtn.onclick = () => {
+		interceptConditions = JSON.parse(localStorage.getItem("interceptConditions") || "[]");
 		const current = interceptConditions[parentIndex]?.[childIndex];
 	  if (!current || !current.body?.query) {
 		alert("当前项未设置有效条件！");
@@ -38,7 +40,15 @@ function createMenuItem(label = "新菜单", isChild = false, condition = {}, pa
     };
   } else {
     addBtn.onclick = () => {
-      const { li: childLi } = createMenuItem("子菜单", true, {}, parentIndex, interceptConditions[parentIndex]?.length || 0);
+		let name = "子菜单";
+		if (Object.keys(items).length === 0) {
+			console.log("items 是空的");
+		}else {
+			items = JSON.parse(items);
+
+			name = `${items.result[0].item.typeLine}-${items.result[0].item.name}`;
+		}
+      const { li: childLi } = createMenuItem(name, true, {}, parentIndex, interceptConditions[parentIndex]?.length || 0);
       li.appendChild(childLi);
       interceptConditions[parentIndex] = interceptConditions[parentIndex] || [];
       interceptConditions[parentIndex].push({});  // 初始化该子菜单的条件
@@ -142,10 +152,16 @@ load();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "interceptXhr") {
     console.log("sidebar 收到 xhr 数据:", message.data);
-    pendingRequests = {
-    method: message.data.method,
-    url: message.data.url,
-    body: message.data.body,
-  };
+	if(message.stage === "beforeSend") {
+		pendingRequests = {
+			method: message.data.method,
+			url: message.data.url,
+			body: message.data.body,
+		};
+		items = {}
+	}else if(message.stage === "onLoad"){
+		items = message.data.response
+	}
+    
   }
 });

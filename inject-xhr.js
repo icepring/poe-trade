@@ -13,8 +13,10 @@
       try {
         const parsed = typeof body === 'string' ? JSON.parse(body) : body;
 
+        // 发送前的拦截
         window.postMessage({
           source: "xhr-interceptor",
+          stage: "beforeSend",
           payload: {
             method: this._method,
             url: this._url,
@@ -22,11 +24,31 @@
           }
         }, "*");
 
-        console.log("拦截到XHR并发送给content.js:", parsed);
+        console.log("拦截到XHR发送:", parsed);
       } catch (e) {
         console.warn("解析body失败:", e);
       }
     }
+
+    // 添加请求完成后的监听
+    this.addEventListener("load", () => {
+      try {
+        window.postMessage({
+          source: "xhr-interceptor",
+          stage: "onLoad",
+          payload: {
+            method: this._method,
+            url: this._url,
+            response: this.responseText,
+            status: this.status
+          }
+        }, "*");
+
+        console.log("XHR 请求完成:", this.responseText);
+      } catch (e) {
+        console.warn("处理load事件失败:", e);
+      }
+    });
 
     return originalSend.apply(this, arguments);
   };

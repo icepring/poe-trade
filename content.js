@@ -46,8 +46,11 @@ function injectSidebar() {
 
 	  chrome.runtime.sendMessage({
 		type: "interceptXhr",
+		stage:event.data.stage,
 		data: event.data.payload
 	  });
+	  const firstName = document.querySelector('.itemName');
+		const firstType = document.querySelector('.itemName.typeLine');
 	});
 
   sidebarIframe = document.createElement("iframe");
