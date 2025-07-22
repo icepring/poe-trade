@@ -2,166 +2,175 @@ const menu = document.getElementById("menu");
 const addRootBtn = document.getElementById("add-root");
 const saveBtn = document.getElementById("save-btn");
 
-let interceptConditions = [];  // 用于存储拦截器的条件（二维数组）
+let interceptConditions = {};  // 用于存储拦截器的条件（以时间戳为键）
 let pendingRequests = {};      // 用于暂存拦截到的XHR请求
-let items = {};      // 用于暂存拦截到的XHR请求
+let items = {};                // 用于暂存响应数据
 
-// 用于生成唯一标识符
-function generateId(parentIndex, childIndex) {
-  return `${parentIndex}-${childIndex}`;  // 使用二维数组的索引来生成唯一标识符
-}
-
-function createMenuItem(label = "新菜单", isChild = false, condition = {}, parentIndex = -1, childIndex = -1) {
+// 创建菜单项（根或子）
+function createMenuItem(label = "新菜单", isChild = false, condition = {}, timestamp = null) {
   const li = document.createElement("li");
+  const menuId = timestamp || Date.now().toString();
+  li.dataset.menuId = menuId;
   if (isChild) li.classList.add("child");
 
   const div = document.createElement("div");
   div.className = "menu-item";
+  div.dataset.timestamp = menuId;
 
   const input = document.createElement("input");
   input.value = label;
 
   const addBtn = document.createElement("button");
-  addBtn.textContent = "＋";
-  if (isChild) {
-    addBtn.textContent = "🔍";
-    addBtn.onclick = () => {
-		interceptConditions = JSON.parse(localStorage.getItem("interceptConditions") || "[]");
-		const current = interceptConditions[parentIndex]?.[childIndex];
-	  if (!current || !current.body?.query) {
-		alert("当前项未设置有效条件！");
-		return;
-	  }
-
-	  const queryString = encodeURIComponent(JSON.stringify(current.body));
-	  const TRAD_URL = 'https://poe.game.qq.com/trade/search';
-	  const jumpUrl = `${TRAD_URL}?q=${queryString}`;
-	  window.open(jumpUrl, '_blank');
-    };
-  } else {
-    addBtn.onclick = () => {
-		let name = "子菜单";
-		if (Object.keys(items).length === 0) {
-			console.log("items 是空的");
-		}else {
-			items = JSON.parse(items);
-
-			name = `${items.result[0].item.typeLine}-${items.result[0].item.name}`;
-		}
-      const { li: childLi } = createMenuItem(name, true, {}, parentIndex, interceptConditions[parentIndex]?.length || 0);
+  addBtn.textContent = isChild ? "🔍" : "＋";
+  addBtn.onclick = () => {
+    if (isChild) {
+      const current = interceptConditions[menuId];
+      if (!current || !current.body?.query) {
+        alert("当前项未设置有效条件！");
+        return;
+      }
+      const queryString = encodeURIComponent(JSON.stringify(current.body));
+      const jumpUrl = `https://poe.game.qq.com/trade/search?q=${queryString}`;
+      window.open(jumpUrl, '_blank');
+    } else {
+      let name = "子菜单";
+      if (Object.keys(items).length !== 0) {
+        items = JSON.parse(items);
+        name = `${items.result[0].item.typeLine}-${items.result[0].item.name}`;
+      }
+      const { li: childLi } = createMenuItem(name, true, {}, menuId);
       li.appendChild(childLi);
-      interceptConditions[parentIndex] = interceptConditions[parentIndex] || [];
-      interceptConditions[parentIndex].push({});  // 初始化该子菜单的条件
-    };
-  }
+
+      interceptConditions[menuId] = interceptConditions[menuId] || [];
+      interceptConditions[menuId].push({});
+    }
+  };
 
   const delBtn = document.createElement("button");
   delBtn.textContent = "🗑";
   delBtn.onclick = () => {
-    // 删除对应的条件数据
-    if (isChild) {
-      // 删除二级菜单数据
-      interceptConditions[parentIndex].splice(childIndex, 1);
-    } else {
-      // 删除一级菜单数据
-      interceptConditions.splice(parentIndex, 1);
-    }
-
-    // 更新 localStorage
+    const id = li.dataset.menuId;
+    delete interceptConditions[id];
     localStorage.setItem("interceptConditions", JSON.stringify(interceptConditions));
-    li.remove(); // 删除DOM元素
+    li.remove();
     alert(`菜单项已删除，并从保存的数据中移除！`);
   };
 
-  // 为二级菜单添加一个保存按钮
   const saveChildBtn = document.createElement("button");
   saveChildBtn.textContent = "💾";
   saveChildBtn.onclick = () => {
-    const id = generateId(parentIndex, childIndex);  // 生成唯一的标识符
-    interceptConditions[parentIndex][childIndex] = pendingRequests;  // 将暂存的请求条件保存到当前菜单
-
-    // 保存到localStorage
+    interceptConditions[menuId] = pendingRequests;
     localStorage.setItem("interceptConditions", JSON.stringify(interceptConditions));
-    alert(`ID: ${id} 条件已保存！`);
+    alert(`ID: ${menuId} 条件已保存！`);
   };
 
   div.appendChild(input);
   div.appendChild(addBtn);
-  if (isChild) div.appendChild(saveChildBtn);  // 仅二级菜单添加保存按钮
+  if (isChild) div.appendChild(saveChildBtn);
   div.appendChild(delBtn);
-  
   li.appendChild(div);
 
-  return { li, parentIndex, childIndex };
+  return { li, menuId };
 }
 
+// 添加根菜单项
 addRootBtn.onclick = () => {
-  const { li, parentIndex, childIndex } = createMenuItem();
+  const { li, menuId } = createMenuItem();
   menu.appendChild(li);
-  interceptConditions.push([]);  // 初始化根菜单的条件
+  interceptConditions[menuId] = [];  // 初始化条件
 };
 
+// 保存配置（序列化输出）
 saveBtn.onclick = () => {
+  validateInterceptConditionsStructure();
   save();
 };
 
 // 保存菜单和条件
 function save() {
-  const extract = (ul) => {
-    return [...ul.children].map((li, parentIndex) => {
+  function extract(ul) {
+    return [...ul.children].map(li => {
       const input = li.querySelector("input");
-      const childUl = li.querySelector("ul");
       const children = [...li.children]
         .filter(child => child.tagName === "LI")
-        .map((child, childIndex) => extract({ children: [child] }, parentIndex, childIndex))
+        .map(childLi => extract({ children: [childLi] }))
         .flat();
 
-      return { name: input.value, children };
+      return {
+        name: input?.value || "未命名",
+        timestamp: li.dataset.menuId,
+        children
+      };
     });
-  };
-
+  }
+  console.log("当前的 interceptConditions:", interceptConditions);
   const data = extract(menu);
   localStorage.setItem("sidebarData", JSON.stringify(data));
-
-  // 保存拦截条件
   localStorage.setItem("interceptConditions", JSON.stringify(interceptConditions));
+  
+  
+  let  test =	localStorage.getItem("interceptConditions");
+  let tym = JSON.parse(localStorage.getItem("interceptConditions") || "{}");
 
   alert("已保存！");
-};
+}
+
+// 校验结构，确保拦截条件有效
+function validateInterceptConditionsStructure() {
+  const allMenuItems = menu.querySelectorAll("li[data-menu-id]");
+  allMenuItems.forEach(li => {
+    const id = li.dataset.menuId;
+    if (!interceptConditions[id]) interceptConditions[id] = [];
+  });
+}
 
 // 加载本地存储的菜单和条件
 function load() {
-  const data = JSON.parse(localStorage.getItem("sidebarData") || "[]");
-  interceptConditions = JSON.parse(localStorage.getItem("interceptConditions") || "[]");
+  let  test =	localStorage.getItem("interceptConditions");
+  const savedData = JSON.parse(localStorage.getItem("sidebarData") || "[]");
+  interceptConditions = JSON.parse(localStorage.getItem("interceptConditions") || "{}");
 
-  const render = (items, parent, parentIndex) => {
-    items.forEach((item, childIndex) => {
-      const { li, p, c } = createMenuItem(item.name, parent !== menu, interceptConditions[parentIndex]?.[childIndex] || {}, parentIndex, childIndex);
+  const render = (items, parent) => {
+    items.forEach(item => {
+      const menuId = item.timestamp || Date.now().toString();
+      const { li } = createMenuItem(item.name, parent !== menu, interceptConditions[menuId] || {}, menuId);
+
       parent.appendChild(li);
+
+      // 如果有子菜单，则递归渲染子菜单
       if (item.children?.length) {
-        render(item.children, li, parentIndex);
+        render(item.children, li);
       }
     });
   };
 
-  render(data, menu, 0);
+  render(savedData, menu);
 }
 
+// 校验加载的数据结构
+function validateLoadedDataStructure() {
+  const allMenuItems = menu.querySelectorAll("li[data-menu-id]");
+  allMenuItems.forEach(li => {
+    const id = li.dataset.menuId;
+    if (!interceptConditions[id]) interceptConditions[id] = [];
+  });
+}
+
+validateLoadedDataStructure();
 load();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "interceptXhr") {
     console.log("sidebar 收到 xhr 数据:", message.data);
-	if(message.stage === "beforeSend") {
-		pendingRequests = {
-			method: message.data.method,
-			url: message.data.url,
-			body: message.data.body,
-		};
-		items = {}
-	}else if(message.stage === "onLoad"){
-		items = message.data.response
-	}
-    
+    if (message.stage === "beforeSend") {
+      pendingRequests = {
+        method: message.data.method,
+        url: message.data.url,
+        body: message.data.body,
+      };
+      items = {};
+    } else if (message.stage === "onLoad") {
+      items = message.data.response;
+    }
   }
 });
